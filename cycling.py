@@ -32,6 +32,7 @@ def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key = ''
             routes = json.loads(r.content)['results']
     else:
         print(f"Error: {r.status_code} - {r.content}")
+        return []
         
     # Loop through the routes, and download if we don't have it
     print(f"Checking {len(routes)} routes from RWGPS for missing routes")
@@ -120,7 +121,7 @@ def find_close_routes ( directory:str, lat:float, lon:float, dist:int = 100, max
 	return list(matched_routes.keys())
 
 # %%
-def make_folium_map( directory:str = './', file_list:list = [], map_name='my_map.html', match_point = None, zoom_level=12):
+def make_folium_map( directory:str = './', file_list:list = [], map_path='routes.html', match_point = None, zoom_level=12, marker_text = ''):
 # assumes input is list of file roots
     for file in file_list:
         route = load_gpx_from_file ( os.path.join(directory, file))
@@ -137,7 +138,7 @@ def make_folium_map( directory:str = './', file_list:list = [], map_name='my_map
         
         #first time through, we create the map - after that, we're just adding lines to it...
         if file_list.index(file) == 0:
-            mymap = folium.Map( location=[ lat_start, long_start ], zoom_start=zoom_level, tiles=None)
+            mymap = folium.Map( location=[ lat_start, long_start ], zoom_start=zoom_level)
             folium.TileLayer('openstreetmap', name='OpenStreet Map', control=False).add_to(mymap)
             #folium.TileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', attr="Tiles &copy; Esri &mdash; National Geographic, Esri, DeLorme, NAVTEQ, UNEP-WCMC, USGS, NASA, ESA, METI, NRCAN, GEBCO, NOAA, iPC", name='Nat Geo Map').add_to(mymap)
             #folium.TileLayer('http://tile.stamen.com/terrain/{z}/{x}/{y}.jpg', attr="terrain-bcg", name='Terrain Map').add_to(mymap)
@@ -169,10 +170,10 @@ def make_folium_map( directory:str = './', file_list:list = [], map_name='my_map
         
     if (match_point != None) :
         #add origin marker to map
-        folium.Marker(match_point, tooltip = f"Match origin lat:{match_point[0]:.4f} lon:{match_point[1]:.4f}", icon=folium.Icon(color='red', icon_color='white', icon=activity_icon, prefix='fa')).add_to(mymap)
+        folium.Marker(match_point, tooltip = marker_text, icon=folium.Icon(color='red', icon_color='white', icon=activity_icon, prefix='fa')).add_to(mymap)
 
     folium.LayerControl(collapsed=False).add_to(mymap)
-    mymap.save(os.path.join(directory, map_name )) # saves to html file for display below
+    mymap.save( map_path ) # saves to html file for display below
 
 # %% [markdown]
 # ## Main
@@ -190,13 +191,14 @@ import argparse
 def main():
     
     parser = argparse.ArgumentParser(
-        description='Find tracks/routes that pass withing a specified distance of a point',
+        description='Find closest tracks/routes that pass withing a specified distance of a point',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', '-p', type=str, default='tracks', help="directory containing GPX tracks/routes")
     parser.add_argument('location', nargs=2, type=float, help="latitude and longitude of target")
     parser.add_argument('--dist', '-d', type=int, default='200', help='min distance in meters track needs to be tospecified point to match')
-    parser.add_argument('--output', '-o', type=str, default='routes.html', help="name of HTML file to generate (will go in 'path' directory)")
+    parser.add_argument('--output', '-o', type=str, default='routes.html', help="name of HTML file to generate (including path relative to current directory)")
     parser.add_argument('--refresh', '-r', action='store_true', help='refresh routes from RWGPS')
+    parser.add_argument('--max', '-m', type=int, default=10, help='find the best # routes')
     
     args = parser.parse_args()
     
@@ -211,14 +213,14 @@ def main():
         refresh_rwgps_routes( args.path )
 
     # OK - now we loop through our tracks and look for one that's near our destination...
-    matches = find_close_routes ( args.path, args.location[0], args.location[1], args.dist )
+    matches = find_close_routes ( args.path, args.location[0], args.location[1], args.dist, args.max )
     #matches = ['36216168.gpx', '32408351.gpx', '43141887.gpx', 'Back_to_Brinkley.gpx', '11764387.gpx', '11775438.gpx', '35648012.gpx', '35592301.gpx']
     #matches = ['Back_to_Brinkley.gpx']
 
     print (f"Matched tracks: {matches}")
 
     # Now make a map with the selected routes on it...
-    map = make_folium_map ( args.path, matches, args.output, match_point = (args.location[0], args.location[1]) )
+    map = make_folium_map ( args.path, matches, args.output, match_point = (args.location[0], args.location[1]), marker_text = f'Closest {args.max} routes within {args.dist:.0f}m of here (lat:{args.location[0]:.4f}, lon:{args.location[1]:.4f}' )
 
 if (__name__ == '__main__'):
     main()
