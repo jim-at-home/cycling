@@ -1,6 +1,10 @@
 # %% [markdown]
 # ## Functions
 
+# %% [markdown]
+# Credits to Patrick who did a folium "Camino's" project which I based the mapping stuff off...
+# (https://github.com/datachico/gpx_to_folium_maps/blob/master/folium_maps_From_GPX.ipynb)
+
 # %%
 def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key = '', auth_token = '' ) -> list:
     # Download routes for a given user from RWGPS
@@ -122,7 +126,10 @@ def find_close_routes ( directory:str, lat:float, lon:float, dist:int = 100, max
 
 # %%
 def make_folium_map( directory:str = './', file_list:list = [], map_path='routes.html', match_point = None, zoom_level=12, marker_text = ''):
-# assumes input is list of file roots
+    activity_icon='bicycle'
+    mymap = None
+
+    # assumes input is list of file roots
     for file in file_list:
         route = load_gpx_from_file ( os.path.join(directory, file))
 		
@@ -130,11 +137,7 @@ def make_folium_map( directory:str = './', file_list:list = [], map_path='routes
 
         #get start and end lat/long
         lat_start, long_start = route['points'][0]
-        lat_end, long_end = route['points'][-1]
-        not_a_loop = calculate_distance(lat_start, long_start, lat_end, long_end) > 500 # less than 500m means we're probably a loop route
-        
         activity_color = ['red', 'blue', 'green', 'orange', 'purple', 'gray', 'pink'][file_list.index(file)%7]
-        activity_icon='bicycle'
         
         #first time through, we create the map - after that, we're just adding lines to it...
         if file_list.index(file) == 0:
@@ -164,16 +167,16 @@ def make_folium_map( directory:str = './', file_list:list = [], map_path='routes
         fg.add_child(folium.vector_layers.CircleMarker(location=[lat_start, long_start], radius=9, color=activity_color, weight=1, fill_color=activity_color, fill_opacity=1, popup=folium.Popup(html_hint)))
         #Overlay triangle
         fg.add_child(folium.RegularPolygonMarker(location=[lat_start, long_start], fill_color='white', fill_opacity=1, color='white', number_of_sides=3, radius=3, rotation=0, popup=folium.Popup(html_hint)))
-        
     
         fg.add_to(mymap)
         
-    if (match_point != None) :
-        #add origin marker to map
-        folium.Marker(match_point, tooltip = marker_text, icon=folium.Icon(color='red', icon_color='white', icon=activity_icon, prefix='fa')).add_to(mymap)
+    if mymap != None :
+        if match_point != None :
+            #add origin marker to map
+            folium.Marker(match_point, tooltip = marker_text, icon=folium.Icon(color='red', icon_color='white', icon=activity_icon, prefix='fa')).add_to(mymap)
 
-    folium.LayerControl(collapsed=False).add_to(mymap)
-    mymap.save( map_path ) # saves to html file for display below
+        folium.LayerControl(collapsed=False).add_to(mymap)
+        mymap.save( map_path ) # saves to html file for display below
 
 # %% [markdown]
 # ## Main
@@ -191,22 +194,18 @@ import argparse
 def main():
     
     parser = argparse.ArgumentParser(
-        description='Find closest tracks/routes that pass withing a specified distance of a point',
+        description='Find closest tracks/routes that pass withing a specified distance of a location',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', '-p', type=str, default='tracks', help="directory containing GPX tracks/routes")
-    parser.add_argument('location', nargs=2, type=float, help="latitude and longitude of target")
-    parser.add_argument('--dist', '-d', type=int, default='200', help='min distance in meters track needs to be tospecified point to match')
+    parser.add_argument('--location', '-l', nargs=2, type=float, default=[52.07597, 0.71737], help="latitude and longitude of target")
+    parser.add_argument('--dist', '-d', type=int, default='800', help='min distance in meters track needs to be tospecified point to match')
     parser.add_argument('--output', '-o', type=str, default='routes.html', help="name of HTML file to generate (including path relative to current directory)")
     parser.add_argument('--refresh', '-r', action='store_true', help='refresh routes from RWGPS')
     parser.add_argument('--max', '-m', type=int, default=10, help='find the best # routes')
     
     args = parser.parse_args()
+    #args = parser.parse_args(['-r'])
     
-    print(args)
-    # hard wire search criteria for routes near Long Melford distance is in metres
-    #lat, lon, dist = 52.07597668709528, 0.7173702199141314, 8000
-    #path = 'tracks'
-
     #refresh our list of tracks from RWGPS
     #refresh_rwgps_routes( args.path, api_key = 'testkey1', auth_token='1869bd7dd7795934a4b2cb311cd5cd7f' )
     if args.refresh:
@@ -220,9 +219,14 @@ def main():
     print (f"Matched tracks: {matches}")
 
     # Now make a map with the selected routes on it...
-    map = make_folium_map ( args.path, matches, args.output, match_point = (args.location[0], args.location[1]), marker_text = f'Closest {args.max} routes within {args.dist:.0f}m of here (lat:{args.location[0]:.4f}, lon:{args.location[1]:.4f}' )
+    if matches :
+        map = make_folium_map ( args.path, matches, args.output, match_point = (args.location[0], args.location[1]), marker_text = f'Closest {args.max} routes within {args.dist:.0f}m of here (lat:{args.location[0]:.4f}, lon:{args.location[1]:.4f}' )
+        print (f"Map {args.output} created")
+    else :
+        print ("No matches")
 
 if (__name__ == '__main__'):
-    main()
+   main()
+
 
 
