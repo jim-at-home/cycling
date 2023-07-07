@@ -119,6 +119,9 @@ def find_close_routes ( directory:str, lat:float, lon:float, dist:int = 100, max
 								if match_file == -1 or matched_routes[file] > distance :
 									matched_routes[file] = distance
 
+	#move output onto newline...
+	print('')
+
 	# one line, but we sort the matches (yields a list of tuples), take the first 'max_routes' of these and convert back into a dictionary
 	matched_routes = dict(sorted(matched_routes.items(),key=lambda x:x[1])[:max_routes])
 	# just return the matched filenames (which are the keys of the dictionary) as a list
@@ -216,10 +219,9 @@ def main():
     #matches = ['36216168.gpx', '32408351.gpx', '43141887.gpx', 'Back_to_Brinkley.gpx', '11764387.gpx', '11775438.gpx', '35648012.gpx', '35592301.gpx']
     #matches = ['Back_to_Brinkley.gpx']
 
-    print (f"Matched tracks: {matches}")
-
     # Now make a map with the selected routes on it...
     if matches :
+        print (f"Matched tracks: {matches}")
         map = make_folium_map ( args.path, matches, args.output, match_point = (args.location[0], args.location[1]), marker_text = f'Closest {args.max} routes within {args.dist:.0f}m of here (lat:{args.location[0]:.4f}, lon:{args.location[1]:.4f}' )
         print (f"Map {args.output} created")
     else :
