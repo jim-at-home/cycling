@@ -39,7 +39,7 @@ def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key = ''
         return []
         
     # Loop through the routes, and download if we don't have it
-    print(f"Checking {len(routes)} routes from RWGPS for missing routes")
+    print(f"Checking most recent {len(routes)} routes from RWGPS for missing routes")
     for route in routes:
         id = f"{route['id']}.gpx"
         if (id not in files):
@@ -122,6 +122,9 @@ def find_close_routes ( directory:str, lat:float, lon:float, dist:int = 100, max
 	#move output onto newline...
 	print('')
 
+	if len(matched_routes) > max_routes:
+		print(f'Warning: {len(matched_routes)} routes matched criteia - output restricted to the closest {max_routes}')
+
 	# one line, but we sort the matches (yields a list of tuples), take the first 'max_routes' of these and convert back into a dictionary
 	matched_routes = dict(sorted(matched_routes.items(),key=lambda x:x[1])[:max_routes])
 	# just return the matched filenames (which are the keys of the dictionary) as a list
@@ -136,7 +139,7 @@ def make_folium_map( directory:str = './', file_list:list = [], map_path='routes
     for file in file_list:
         route = load_gpx_from_file ( os.path.join(directory, file))
 		
-        print('data created for ' + file)
+        #print('data created for ' + file)
 
         #get start and end lat/long
         lat_start, long_start = route['points'][0]
@@ -193,6 +196,7 @@ import folium
 from folium import plugins
 from math import sin, cos, sqrt, atan2, radians
 import argparse
+import webbrowser
 
 def main():
     
@@ -200,7 +204,7 @@ def main():
         description='Find closest tracks/routes that pass withing a specified distance of a location',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--path', '-p', type=str, default='tracks', help="directory containing GPX tracks/routes")
-    parser.add_argument('--location', '-l', nargs=2, type=float, default=[52.07597, 0.71737], help="latitude and longitude of target")
+    parser.add_argument('--location', '-l', nargs=2, type=float, default=[0, 0], help="latitude and longitude of target")
     parser.add_argument('--dist', '-d', type=int, default='800', help='min distance in meters track needs to be tospecified point to match')
     parser.add_argument('--output', '-o', type=str, default='routes.html', help="name of HTML file to generate (including path relative to current directory)")
     parser.add_argument('--refresh', '-r', action='store_true', help='refresh routes from RWGPS')
@@ -215,7 +219,11 @@ def main():
         refresh_rwgps_routes( args.path )
 
     # OK - now we loop through our tracks and look for one that's near our destination...
-    matches = find_close_routes ( args.path, args.location[0], args.location[1], args.dist, args.max )
+    if (args.location[0] != 0):
+        matches = find_close_routes ( args.path, args.location[0], args.location[1], args.dist, args.max )
+    else:
+        matches = None
+         
     #matches = ['36216168.gpx', '32408351.gpx', '43141887.gpx', 'Back_to_Brinkley.gpx', '11764387.gpx', '11775438.gpx', '35648012.gpx', '35592301.gpx']
     #matches = ['Back_to_Brinkley.gpx']
 
@@ -224,6 +232,7 @@ def main():
         print (f"Matched tracks: {matches}")
         map = make_folium_map ( args.path, matches, args.output, match_point = (args.location[0], args.location[1]), marker_text = f'Closest {args.max} routes within {args.dist:.0f}m of here (lat:{args.location[0]:.4f}, lon:{args.location[1]:.4f}' )
         print (f"Map {args.output} created")
+        webbrowser.open(args.output)
     else :
         print ("No matches")
 
