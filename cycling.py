@@ -6,10 +6,10 @@
 # (https://github.com/datachico/gpx_to_folium_maps/blob/master/folium_maps_From_GPX.ipynb)
 
 # %%
-def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key = '', auth_token = '' ) -> list:
+def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key:str = 'testkey1', auth_token:str = '1869bd7dd7795934a4b2cb311cd5cd7f' ) -> list:
     # Download routes for a given user from RWGPS
     # Downloads into directory ".\tracks" relative to CWD by default, only if the GPX file isn't already there
-    # If you have a developer token, this can check many routes, otherwise the public interface seems to load the most recent 25
+    # You now (as of May-25) need a developer token to access these methods...
     # (see https://ridewithgps.com/api)
     if not(os.path.exists(directory)):
         os.mkdir(directory)
@@ -21,12 +21,14 @@ def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key = ''
             files.append(file)
     print (f"Found {len(files)} existing routes in directory '{directory}'...")
     
-    # Now, load the latest routes from RWGPS - public method seems to get latest 25 routes... User 657096 is me!
-    if api_key == "":
-        r = requests.get (f"https://ridewithgps.com/users/{user}/routes.json" )
-    else:
-        #...or call with credentials can take parameters, but need auth token...
-        r = requests.get (f"https://ridewithgps.com/users/{user}/routes.json", params={"offset" : "0", "limit" : "500", "version": "2", "apikey": api_key, "auth_token": auth_token } )
+    # Now, load the latest routes from RWGPS - user 657096 is me!
+    # Call with credentials - first get the total number of routes...
+    r = requests.get (f"https://ridewithgps.com/users/{user}/routes.json", params={"offset" : "0", "limit" : "0", "version": "2", "apikey": api_key, "auth_token": auth_token } )
+    if (r.status_code == 200 ) :
+        route_count = json.loads(r.content)['results_count']
+        # ...now get the last 100 routes...
+        offset = max (route_count-100, 0)
+        r = requests.get (f"https://ridewithgps.com/users/{user}/routes.json", params={"offset" : offset, "limit" : "100", "version": "2", "apikey": api_key, "auth_token": auth_token } )
 
     if (r.status_code == 200) :
         if (api_key == ""):
@@ -39,12 +41,12 @@ def refresh_rwgps_routes ( directory = 'tracks', user:int = 657096, api_key = ''
         return []
         
     # Loop through the routes, and download if we don't have it
-    print(f"Checking most recent {len(routes)} routes from RWGPS for missing routes")
+    print(f"Checking most recent {len(routes)} of {route_count} routes from RWGPS for missing routes")
     for route in routes:
         id = f"{route['id']}.gpx"
         if (id not in files):
             print(f'Route: {id} does not exist - downloading GPX...')
-            r = requests.get (f"https://ridewithgps.com/routes/{id}")
+            r = requests.get (f"https://ridewithgps.com/routes/{id}", params={"apikey":api_key, "auth_token":auth_token})
             if (r.status_code == 200):
                 with open(f"tracks\\{id}", "wb") as file:
                     file.write(r.content)
@@ -105,7 +107,7 @@ def find_close_routes ( directory:str, lat:float, lon:float, dist:int = 100, max
 	for file in os.listdir(directory):
 		count += 1
 		if os.path.isfile(os.path.join(directory, file)) and file.endswith('.gpx') :
-			print(f"Checking files: {file} - {count / num_tracks:.1%}", end="\r")
+			print(f"Checking files ({len(matched_routes)} matches): {file} - {count / num_tracks:.1%}", end="\r")
 			with open(os.path.join(directory, file), 'r') as gpx_file:
 				gpx = gpxpy.parse(gpx_file)
 				for track in gpx.tracks:
@@ -211,10 +213,9 @@ def main():
     parser.add_argument('--max', '-m', type=int, default=10, help='find the best # routes')
     
     args = parser.parse_args()
-    #args = parser.parse_args(['-r'])
+    #args = parser.parse_args(['-r', '-l', '52.140127', '-0.049296'])
     
     #refresh our list of tracks from RWGPS
-    #refresh_rwgps_routes( args.path, api_key = 'testkey1', auth_token='1869bd7dd7795934a4b2cb311cd5cd7f' )
     if args.refresh:
         refresh_rwgps_routes( args.path )
 
